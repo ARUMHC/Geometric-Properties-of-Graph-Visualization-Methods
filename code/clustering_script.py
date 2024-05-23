@@ -12,6 +12,8 @@ warnings.filterwarnings('ignore')
 import igraph as ig
 import community
 from graph_generating_script import *
+from sklearn.model_selection import ParameterGrid
+import networkx as nx
 
 
 from sklearn.cluster import KMeans
@@ -37,7 +39,10 @@ def find_best_num_clusters(data, max_clusters=10):
 from sklearn.cluster import AgglomerativeClustering, OPTICS
 
 
-def get_clusters_from_positions(G, posdf, best_num, true_labels, k=1):
+# get results from one model on one graph on one of the layouts
+# returns : scores - list with ARI
+
+def get_clusters_from_positions(posdf, best_num, true_labels):
     #agglomerative clustering
     scores = []
     # for i in range(k):
@@ -76,21 +81,12 @@ def get_clusters_from_positions(G, posdf, best_num, true_labels, k=1):
     # scores[4] += adjusted_rand_score(true_labels, yhat)
     scores.append(adjusted_rand_score(true_labels, yhat))
 
-    # communities = girvan_newman(G)
 
-    #community detections
+    return scores
 
-    #Girvan Newman
-    # communities = girvan_newman(G)
-    # comms = []
-    # for com in next(communities):
-    #     comms.append(list(com))
-    # list_comms = [None] * len(G.nodes)
-    # for i in range(len(comms)):
-    #     com = comms[i]
-    #     for node in com:
-    #         list_comms[node] = i
 
+def get_communities(G, true_labels):
+    scores = []
     #separate tool to choose number of communities for girvan newman
     partition = community.best_partition(G)
     num_communities = len(set(partition.values()))
@@ -116,15 +112,34 @@ def get_clusters_from_positions(G, posdf, best_num, true_labels, k=1):
     # scores[5] += adjusted_rand_score(true_labels, list_comms)
 
     #Leiden
+    # G_ig = ig.Graph.TupleList(nx.to_edgelist(G), directed=False)
+    # partition = G_ig.community_leiden(objective_function="modularity")
+    # list_comms = [None] * len(G.nodes)
+    # for i, com in enumerate(partition):
+    #     for node in com:
+    #         list_comms[node] = i
     G_ig = ig.Graph.TupleList(nx.to_edgelist(G), directed=False)
-    partition = G_ig.community_leiden(objective_function="modularity", resolution=1)
+
+    resolutions = np.linspace(0.1, 1.5, 10)  # Adjust the range as needed
+    param_grid = {'resolution': resolutions}
+    grid = ParameterGrid(param_grid)
+
+    best_modularity = -np.inf
+    best_partition = None
+    for params in grid:
+        partition = G_ig.community_leiden(objective_function="modularity", **params)
+        modularity = G_ig.modularity(partition)
+        if modularity > best_modularity:
+            best_modularity = modularity
+            best_partition = partition
+
     list_comms = [None] * len(G.nodes)
-    for i, com in enumerate(partition):
+    for i, com in enumerate(best_partition):
         for node in com:
             list_comms[node] = i
-
     # scores[6] += adjusted_rand_score(true_labels, list_comms)
     scores.append(adjusted_rand_score(true_labels, list_comms))
+
     return scores
 
 def add_scores(df, scores, layout_name='spring'):
@@ -134,31 +149,36 @@ def add_scores(df, scores, layout_name='spring'):
     df = pd.DataFrame(data)
     return df
 
-def scaling_igraph(layout):
-    coords = np.array(layout.coords)
-    min_coords = coords.min(axis=0)
-    max_coords = coords.max(axis=0)
-    scaled_coords = 2 * (coords - min_coords) / (max_coords - min_coords) - 1
-    posdf = pd.DataFrame(scaled_coords, columns=['X', 'Y'])
-    return posdf
+# def scaling_igraph(layout):
+#     coords = np.array(layout.coords)
+#     min_coords = coords.min(axis=0)
+#     max_coords = coords.max(axis=0)
+#     scaled_coords = 2 * (coords - min_coords) / (max_coords - min_coords) - 1
+#     posdf = pd.DataFrame(scaled_coords, columns=['X', 'Y'])
+#     return posdf
 
-def full_experiment_on_graph(G, true_labels):
-    df = pd.DataFrame(columns=['layout','AgglomerativeClustering', 'OPTICS', 'KMeans', 'GMM', 'Birch', 'Girvan Newman', 'Leiden'])
-    
+
+# coducts ONE experiemnt for all (7) the layouts
+# returns : df with ARI layouts and algoriths for ONE graph
+
+def full_cluster_experiment(G, true_labels):
+    # df = pd.DataFrame(columns=['layout','AgglomerativeClustering', 'OPTICS', 'KMeans', 'GMM', 'Birch', 'Girvan Newman', 'Leiden'])
+    df = pd.DataFrame(columns=['layout','AgglomerativeClustering', 'OPTICS', 'KMeans', 'GMM', 'Birch'])
+
     #for every layout
     #kamada kawai
     pos = nx.kamada_kawai_layout(G)
     posdf = pd.DataFrame.from_dict(pos, orient='index', columns=['X', 'Y'])
     best_num = find_best_num_clusters(posdf)
     # print(f'Best number of clusters detected : {best_num}')
-    scores = get_clusters_from_positions(G,posdf, best_num, true_labels)
+    scores = get_clusters_from_positions(posdf, best_num, true_labels)
     df = add_scores(df, scores, 'kamada_kawai')
 
     #spring layout
     pos = nx.spring_layout(G)
     posdf = pd.DataFrame.from_dict(pos, orient='index', columns=['X', 'Y'])
     best_num = find_best_num_clusters(posdf)
-    scores = get_clusters_from_positions(G,posdf, best_num, true_labels)
+    scores = get_clusters_from_positions(posdf, best_num, true_labels)
     df = add_scores(df, scores, 'spring')
 
     #algorithms from igraph
@@ -166,65 +186,76 @@ def full_experiment_on_graph(G, true_labels):
 
     #davidson harel
     layout = G_ig.layout('davidson_harel')
-    posdf = scaling_igraph(layout)
-    # posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
+    # posdf = scaling_igraph(layout)
+    posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
     best_num = find_best_num_clusters(posdf)
-    scores = get_clusters_from_positions(G, posdf, best_num, true_labels)
+    scores = get_clusters_from_positions( posdf, best_num, true_labels)
     df = add_scores(df, scores, 'davidson_harel')
 
     #drl
     layout = G_ig.layout('drl')
-    posdf = scaling_igraph(layout)
-    # posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
+    # posdf = scaling_igraph(layout)
+    posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
     best_num = find_best_num_clusters(posdf)
-    scores = get_clusters_from_positions(G, posdf, best_num, true_labels)
+    scores = get_clusters_from_positions( posdf, best_num, true_labels)
     df = add_scores(df, scores, 'drl')
 
     # fruchterman reingold
     layout = G_ig.layout('fruchterman_reingold')
-    posdf = scaling_igraph(layout)
-    # posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
+    # posdf = scaling_igraph(layout)
+    posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
     best_num = find_best_num_clusters(posdf)
-    scores = get_clusters_from_positions(G, posdf, best_num, true_labels)
+    scores = get_clusters_from_positions( posdf, best_num, true_labels)
     df = add_scores(df, scores, 'fruchterman_reingold')
 
     #graphopt
     layout = G_ig.layout('graphopt')
-    posdf = scaling_igraph(layout)
-    # posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
+    # posdf = scaling_igraph(layout)
+    posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
     best_num = find_best_num_clusters(posdf)
-    scores = get_clusters_from_positions(G, posdf, best_num, true_labels)
+    scores = get_clusters_from_positions( posdf, best_num, true_labels)
     df = add_scores(df, scores, 'graphopt')
 
     #lgl
     layout = G_ig.layout('lgl')
-    posdf = scaling_igraph(layout)
-    # posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
+    # posdf = scaling_igraph(layout)
+    posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
     best_num = find_best_num_clusters(posdf)
-    scores = get_clusters_from_positions(G,  posdf, best_num, true_labels)
+    scores = get_clusters_from_positions( posdf, best_num, true_labels)
     df = add_scores(df, scores, 'lgl')
 
     #mds
     layout = G_ig.layout('mds')
-    posdf = scaling_igraph(layout)
-    # posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
+    # posdf = scaling_igraph(layout)
+    posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
     best_num = find_best_num_clusters(posdf)
-    scores = get_clusters_from_positions(G, posdf, best_num, true_labels)
+    scores = get_clusters_from_positions(posdf, best_num, true_labels)
     df = add_scores(df, scores, 'mds')
 
     return df
-            
+
+# generates k graphs and conducts FULL experiments on them
+# it sums up ARIs and divides by k (average)
+# returns : df
+
+
 def steady_full_experiment(sizes, inside_prob, outside_prob, k=5):
 
     (G, true_labels)= generate_G(sizes, inside_prob, outside_prob)
-    df = full_experiment_on_graph(G, true_labels)
-    # print("0")
-    # print(df)
-    for i in range(1,k):
+    df = full_cluster_experiment(G, true_labels)
+    #comms - list with two values
+    comms = get_communities(G, true_labels)
+    #tu trzeba rozbic i osobno zrobic clustry, osobno community detection
+    for i in range(1, k):
         (G, true_labels)= generate_G(sizes, inside_prob, outside_prob)
-        tmp = full_experiment_on_graph(G, true_labels)
+        tmp = full_cluster_experiment(G, true_labels)
         df[df.columns[1:]] += tmp[tmp.columns[1:]]
 
+        tmp = get_communities(G, true_labels)
+        comms += tmp
+
     df[df.columns[1:]] /= k
+    df['Girvan-Newman'] = comms[0]/k
+    df['Leiden'] = comms[1]/k
     return df
     
