@@ -156,7 +156,7 @@ def add_scores(df, scores, layout_name='spring'):
     return df
 
 #gap statistics
-def gap_num_clusters(data, nrefs=5, maxClusters=15):
+def gap_num_clusters(data, nrefs=5, maxClusters=7):
     """
     Calculates KMeans optimal K using Gap Statistic 
     Params:
