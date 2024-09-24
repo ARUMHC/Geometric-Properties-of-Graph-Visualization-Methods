@@ -20,3 +20,22 @@ Data Science Master Thesis 2024
 - smol to byłby 50 wierzchołków, z równymi i nierównymi rozmiarami
 - medium to moze 300 wierzchłoków???
 - large to 1000 (do konsultacji z siudemem)
+
+
+# FILE STRUCTURE
+
+graph_generatin_script -> funkcje do generowania grafow
+clustering_script -> funkcje do experymentow
+ full_cluster_experiment :
+ 
+ * coducts ONE experiemnt for all (7) the layouts
+ * returns : df with ARI layouts and algoriths for ONE graph
+
+ stead_full_exeriment :
+
+* generates k graphs and conducts FULL experiments on them
+* it sums up ARIs and divides by k (average)
+* returns : df
+
+assortativity -> do archive?
+number_of_clusters -> testy do wybierania optymalnego wybierania liczby klastrow
