@@ -25,21 +25,6 @@ from tqdm import tqdm
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 import numpy as np
-def find_best_num_clusters(data, max_clusters=10):
-    best_score = -1
-    best_num_clusters = 2  # Minimum number of clusters
-    
-    for n_clusters in range(2, max_clusters + 1):
-        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-        cluster_labels = kmeans.fit_predict(data)
-        silhouette_avg = silhouette_score(data, cluster_labels)
-        
-        if silhouette_avg > best_score:
-            best_score = silhouette_avg
-            best_num_clusters = n_clusters
-    
-    return best_num_clusters
-
 
 from sklearn.cluster import AgglomerativeClustering, OPTICS
 
@@ -47,7 +32,7 @@ from sklearn.cluster import AgglomerativeClustering, OPTICS
 # get results from one model on one graph on one of the layouts
 # returns : scores - list with ARI
 
-#todo refactor it so it returns a dictionary
+#done refactor it so it returns a dictionary
 def get_clustering_scores_from_positions(posdf, best_num, true_labels)->dict:
 
     '''
@@ -167,36 +152,6 @@ def get_communities_scores_from_positions(G, true_labels):
 
 #todo make a new proper notebook and conduct proper cluster choosing analysis
 #todo zrob to porzadnie faktycznie, cmon
-#gap statistics
-def gap_num_clusters(data, nrefs=5, maxClusters=7):
-    """
-    Calculates KMeans optimal K using Gap Statistic 
-    Params:
-        data: ndarry of shape (n_samples, n_features)
-        nrefs: number of sample reference datasets to create
-        maxClusters: Maximum number of clusters to test for
-    Returns: (gaps, optimalK)
-    """
-    gaps = np.zeros((len(range(1, maxClusters)),))
-    # resultsdf = pd.DataFrame({'clusterCount':[], 'gap':[]})
-    for gap_index, k in enumerate(range(1, maxClusters)):
-        refDisps = np.zeros(nrefs)
-        for i in range(nrefs):
-            # Create new random reference set
-            randomReference = np.random.random_sample(size=data.shape)
-            # Fit to it
-            km = KMeans(k)
-            km.fit(randomReference)
-            
-            refDisp = km.inertia_
-            refDisps[i] = refDisp
-        km = KMeans(k)
-        km.fit(data)
-        origDisp = km.inertia_
-        gap = np.log(np.mean(refDisps)) - np.log(origDisp)
-        gaps[gap_index] = gap
-                
-    return gaps.argmax() + 1
 
 
 # def scaling_igraph(layout):
@@ -211,14 +166,7 @@ def gap_num_clusters(data, nrefs=5, maxClusters=7):
 # coducts ONE experiemnt for all (7) the layouts
 # returns : df with ARI layouts and algoriths for ONE graph
 
-def calculate_scores_for_layout(layout_name, G, true_labels):
-    '''
-    helper function
-
-    returns
-    {'AgglomerativeClustering': 1.0, 'OPTICS': 0.9623418543390346, 'KMeans': 1.0, 'GMM': 1.0, 'Birch': 0.6011004126547456}
-    '''
-
+def posdf_from_layout(G, layout_name):
     if layout_name=='kamada_kawai':
         pos = nx.kamada_kawai_layout(G)
         posdf = pd.DataFrame.from_dict(pos, orient='index', columns=['X', 'Y'])
@@ -252,22 +200,24 @@ def calculate_scores_for_layout(layout_name, G, true_labels):
     else:
         raise ValueError('Wrong layout name (probably typo)')
 
-    
-    #todo chage this 
+    return posdf
+def calculate_scores_for_layout(G, true_labels, layout_name):
+    '''
+    helper function
+
+    returns
+    {'AgglomerativeClustering': 1.0, 'OPTICS': 0.9623418543390346, 'KMeans': 1.0, 'GMM': 1.0, 'Birch': 0.6011004126547456}
+  
+    '''
+
+    posdf = posdf_from_layout(G, layout_name)
+    #todo change this to not be hardcoded
     best_num = 5
     # best_num = find_best_num_clusters(posdf)
     ari_scores = get_clustering_scores_from_positions(posdf, best_num, true_labels)
     ari_scores['layout'] = layout_name
 
     return ari_scores
-# def add_scores(df:pd.DataFrame, ari_scores:dict, layout_name:str='spring'):
-
-#     ari_scores['layout'] = layout_name
-#     # data = df.to_dict('records')
-#     # data.append(dict(zip(df.columns, scores)))
-
-#     df = pd.DataFrame(data)
-#     return df
 
 
 

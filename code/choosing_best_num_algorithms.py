@@ -10,16 +10,19 @@ warnings.filterwarnings('ignore')
 from yellowbrick.cluster import KElbowVisualizer
 from sklearn.mixture import GaussianMixture
 
+'''
+Five different algorithms to choose best number of clusters:
+* gap statistic
+* silhouette
+* elbow method
+* calinski harabasz
+* BIC + GMM
 
-def gap_statistic_best_num(posdf, nrefs=3, max_clusters=15):
-        """
-        Calculates KMeans optimal K using Gap Statistic 
-        Param s:
-        data: ndarry of shape (n_samples, n_features)
-        nrefs: number of sample reference datasets to create
-        maxClusters: Maximum number of clusters to test for
-        Returns: (gaps, optimalK)
-        """
+all those functions take posdf and max_clusters as arguments
+all return optimal numbers of clusters and dataframe with scores
+'''
+
+def gap_statistic_best_num(posdf, max_clusters=10, nrefs=3):
         gaps = np.zeros((len(range(1, max_clusters)),))
         df_scores = pd.DataFrame({'clusterCount':[], 'gap':[]})
         for gap_index, k in enumerate(range(1, max_clusters)):
@@ -63,8 +66,13 @@ def elbow_method_best_num(posdf, max_clusters=10):
     # visualizer.show()    
     scores=visualizer.k_scores_
     df_scores = pd.DataFrame({'k': range(2, max_clusters), 'score': scores})
+    if visualizer.elbow_value_ is None:
+        # Return the k with the minimum score (inertia)
+        best_k = df_scores.loc[df_scores['score'].idxmin()]['k']
+    else:
+        best_k = int(visualizer.elbow_value_)
     
-    return(visualizer.elbow_value_, df_scores)
+    return(int(best_k), df_scores)
 
 def silhouette_best_num(posdf, max_clusters=10):
     model = KMeans()
@@ -77,8 +85,12 @@ def silhouette_best_num(posdf, max_clusters=10):
     # visualizer.show() 
     scores = visualizer.k_scores_
     df_scores = pd.DataFrame({'k': range(2, max_clusters), 'score': scores})
-    
-    return(visualizer.elbow_value_, df_scores)
+    if visualizer.elbow_value_ is None:
+         best_row = df_scores.loc[df_scores['score'].idxmax()]
+         best_num = best_row['k']
+    else:
+         best_num = visualizer.elbow_value_
+    return(int(best_num), df_scores)
 
 
 def calinski_harabasz_best_num(posdf, max_clusters=10):
@@ -92,8 +104,13 @@ def calinski_harabasz_best_num(posdf, max_clusters=10):
     # visualizer.show() 
     scores = visualizer.k_scores_
     df_scores = pd.DataFrame({'k': range(2, max_clusters), 'score': scores})
+    if visualizer.elbow_value_ is None:
+        # Return the k with the highest score (Calinski-Harabasz index)
+        best_k = df_scores.loc[df_scores['score'].idxmax()]['k']
+    else:
+        best_k = int(visualizer.elbow_value_)
     
-    return(visualizer.elbow_value_, df_scores)   
+    return(best_k, df_scores)   
 
 
 def BIC_best_num(posdf, max_clusters=10):
@@ -116,4 +133,4 @@ def BIC_best_num(posdf, max_clusters=10):
     optimal_n_components = min_bic_row['n_components']
     # optimal_bic = min_bic_row['bic']
 
-    return (optimal_n_components, score)
+    return (int(optimal_n_components), score)
