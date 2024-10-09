@@ -113,6 +113,13 @@ def calinski_harabasz_best_num(posdf, max_clusters=10):
     return(best_k, df_scores)   
 
 
+def mix_ch_elbow(posdf, coef_ch = .5, coef_elbow = .5, max_clusters=10):
+     best_k_ci , _ = calinski_harabasz_best_num(posdf, max_clusters)
+     best_k_elbow, _  = elbow_method_best_num(posdf, max_clusters)
+     return round(coef_ch*best_k_ci + coef_elbow*best_k_elbow)
+
+
+
 def BIC_best_num(posdf, max_clusters=10):
     n_components = range(2, max_clusters)
     covariance_type = ['spherical', 'tied', 'diag', 'full']
@@ -134,3 +141,6 @@ def BIC_best_num(posdf, max_clusters=10):
     # optimal_bic = min_bic_row['bic']
 
     return (int(optimal_n_components), score)
+
+from sklearn.metrics import calinski_harabasz_score
+from sklearn.cluster import KMeans
