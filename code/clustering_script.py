@@ -21,13 +21,8 @@ from sklearn.metrics import silhouette_score
 import numpy as np
 from tqdm import tqdm
 
-
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
-import numpy as np
-
 from sklearn.cluster import AgglomerativeClustering, OPTICS
-
+from choosing_best_num_algorithms import mix_ch_elbow
 
 # get results from one model on one graph on one of the layouts
 # returns : scores - list with ARI
@@ -50,6 +45,8 @@ def get_clustering_scores_from_positions(posdf, best_num, true_labels)->dict:
     model = AgglomerativeClustering(n_clusters=best_num)
     model.fit(posdf)
     yhat = list(model.labels_)
+    print(len(posdf))
+    print(len(yhat))
     # scores[0] += adjusted_rand_score(true_labels, yhat)
     # ari_scores.append(adjusted_rand_score(true_labels, yhat))
     ari_scores['AgglomerativeClustering'] = adjusted_rand_score(true_labels, yhat)
@@ -108,11 +105,12 @@ def get_communities_scores_from_positions(G, true_labels):
         G1.remove_edge(*max_edge)
     
     communities = list(nx.connected_components(G1))
-   
-    list_comms = [None] * len(G.nodes)
-    for i, com in enumerate(communities):
-        for node in com:
-            list_comms[node] = i
+    list_comms = [i for i, com in enumerate(communities) for node in com]
+
+    # list_comms = [None] * len(G.nodes)
+    # for i, com in enumerate(communities):
+    #     for node in com:
+    #         list_comms[node] = i
 
 
     ari_scores['Girvan Newman'] = adjusted_rand_score(true_labels, list_comms)
@@ -140,10 +138,13 @@ def get_communities_scores_from_positions(G, true_labels):
             best_modularity = modularity
             best_partition = partition
 
-    list_comms = [None] * len(G.nodes)
-    for i, com in enumerate(best_partition):
-        for node in com:
-            list_comms[node] = i
+    # list_comms = [None] * len(G.nodes)
+    # for i, com in enumerate(best_partition):
+    #     for node in com:
+    #         list_comms[node] = i
+    list_comms = [i for i, com in enumerate(best_partition) for node in com]
+
+
     # scores[6] += adjusted_rand_score(true_labels, list_comms)
     ari_scores['Leiden'] = adjusted_rand_score(true_labels, list_comms)
 
@@ -167,6 +168,7 @@ def get_communities_scores_from_positions(G, true_labels):
 # returns : df with ARI layouts and algoriths for ONE graph
 
 def posdf_from_layout(G, layout_name):
+
     if layout_name=='kamada_kawai':
         pos = nx.kamada_kawai_layout(G)
         posdf = pd.DataFrame.from_dict(pos, orient='index', columns=['X', 'Y'])
@@ -175,32 +177,52 @@ def posdf_from_layout(G, layout_name):
         posdf = pd.DataFrame.from_dict(pos, orient='index', columns=['X', 'Y'])
     elif layout_name=='davidson_harel':
         G_ig = ig.Graph.TupleList(nx.to_edgelist(G), directed=False)
+        missing_vertices = set(G.nodes()) - set(G_ig.vs['name'])
+        G_ig.add_vertices(list(missing_vertices))
         layout = G_ig.layout('davidson_harel')
         posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
     elif layout_name=='drl':
         G_ig = ig.Graph.TupleList(nx.to_edgelist(G), directed=False)
+        missing_vertices = set(G.nodes()) - set(G_ig.vs['name'])
+        G_ig.add_vertices(list(missing_vertices))
         layout = G_ig.layout('drl')
         posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
     elif layout_name=='fruchterman_reingold':
         G_ig = ig.Graph.TupleList(nx.to_edgelist(G), directed=False)
+        missing_vertices = set(G.nodes()) - set(G_ig.vs['name'])
+        G_ig.add_vertices(list(missing_vertices))
         layout = G_ig.layout('fruchterman_reingold')
         posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
     elif layout_name=='graphopt':
         G_ig = ig.Graph.TupleList(nx.to_edgelist(G), directed=False)
+        missing_vertices = set(G.nodes()) - set(G_ig.vs['name'])
+        G_ig.add_vertices(list(missing_vertices))
         layout = G_ig.layout('graphopt')
         posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
     elif layout_name=='lgl':
         G_ig = ig.Graph.TupleList(nx.to_edgelist(G), directed=False)
+        missing_vertices = set(G.nodes()) - set(G_ig.vs['name'])
+        G_ig.add_vertices(list(missing_vertices))
         layout = G_ig.layout('lgl')
         posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
     elif layout_name=='mds':
         G_ig = ig.Graph.TupleList(nx.to_edgelist(G), directed=False)
+        missing_vertices = set(G.nodes()) - set(G_ig.vs['name'])
+        G_ig.add_vertices(list(missing_vertices))
         layout = G_ig.layout('mds')
         posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
     else:
         raise ValueError('Wrong layout name (probably typo)')
-
+    print(len(posdf))
     return posdf
+
+def best_number_of_clusters(G, max_clusters=10):
+    posdf = posdf_from_layout(G, 'graphopt')
+    best_num = mix_ch_elbow(posdf, .75, .25, max_clusters=max_clusters)
+    return best_num
+
+
+
 def calculate_scores_for_layout(G, true_labels, layout_name):
     '''
     helper function
@@ -209,10 +231,10 @@ def calculate_scores_for_layout(G, true_labels, layout_name):
     {'AgglomerativeClustering': 1.0, 'OPTICS': 0.9623418543390346, 'KMeans': 1.0, 'GMM': 1.0, 'Birch': 0.6011004126547456}
   
     '''
-
     posdf = posdf_from_layout(G, layout_name)
+    print(len(posdf))
     #todo change this to not be hardcoded
-    best_num = 5
+    best_num = best_number_of_clusters(G)
     # best_num = find_best_num_clusters(posdf)
     ari_scores = get_clustering_scores_from_positions(posdf, best_num, true_labels)
     ari_scores['layout'] = layout_name
@@ -225,38 +247,17 @@ def full_cluster_experiment(G, true_labels):
     '''
     for ONE graph gets results of ALL layouts (all clustering algorithms)
     '''
+    print("FULL CLUSTER EXPERIMENT")
     # df = pd.DataFrame(columns=['layout','AgglomerativeClustering', 'OPTICS', 'KMeans', 'GMM', 'Birch', 'Girvan Newman', 'Leiden'])
     df = pd.DataFrame(columns=['layout','AgglomerativeClustering', 'OPTICS', 'KMeans', 'GMM', 'Birch'])
 
     #for every layout
     #kamada kawai
-    #todo refactor this code
-    layout_name = 'kamada_kawai'
-    ari_scores = calculate_scores_for_layout(layout_name, G, true_labels)
-    df.loc[len(df)] = ari_scores
-    # df = add_scores(df, scores, layout_name)
-    layout_name = 'spring'
-    ari_scores = calculate_scores_for_layout(layout_name, G, true_labels)
-    df.loc[len(df)] = ari_scores
-    layout_name = 'davidson_harel'
-    ari_scores = calculate_scores_for_layout(layout_name, G, true_labels)
-    df.loc[len(df)] = ari_scores
-    layout_name = 'drl'
-    ari_scores = calculate_scores_for_layout(layout_name, G, true_labels)
-    df.loc[len(df)] = ari_scores
-    layout_name = 'fruchterman_reingold'
-    ari_scores = calculate_scores_for_layout(layout_name, G, true_labels)
-    df.loc[len(df)] = ari_scores
-    layout_name = 'graphopt'
-    ari_scores = calculate_scores_for_layout(layout_name, G, true_labels)
-    df.loc[len(df)] = ari_scores
-    layout_name = 'lgl'
-    ari_scores = calculate_scores_for_layout(layout_name, G, true_labels)
-    df.loc[len(df)] = ari_scores
-    layout_name = 'mds'
-    ari_scores = calculate_scores_for_layout(layout_name, G, true_labels)
-    df.loc[len(df)] = ari_scores
-   
+    layout_names = ['kamada_kawai', 'spring', 'davidson_harel', 'drl', 'fruchterman_reingold', 'graphopt', 'lgl','mds']
+    for layout_name in layout_names:
+        ari_scores = calculate_scores_for_layout(G, true_labels, layout_name)
+        df.loc[len(df)] = ari_scores
+    print(df)
     return df
 
 # generates k graphs and conducts FULL experiments on them
@@ -265,7 +266,7 @@ def full_cluster_experiment(G, true_labels):
 
 def steady_full_experiment(n_vertex, n_comms, inside_prob, outside_prob, k=5, i_want_boxplot=False, dispersion=.35):
     '''
-    generates k graphs and conducts FULL experiments on them
+    generates k graphs and conducts FULL experiment on them
     it sums up ARIs and divides by k (average)
     returns
 
@@ -284,6 +285,7 @@ def steady_full_experiment(n_vertex, n_comms, inside_prob, outside_prob, k=5, i_
     (G, true_labels) = generate_G_randomized(n_vertex, n_comms, inside_prob, outside_prob)
     asor = nx.numeric_assortativity_coefficient(G, "community")
     df = full_cluster_experiment(G, true_labels)
+    print(df)
     df.iloc[:, 1:] = df.iloc[:, 1:].applymap(lambda x: [x])
     #comms - dict with two values
     # comms = get_communities(G, true_labels)
@@ -305,6 +307,7 @@ def steady_full_experiment(n_vertex, n_comms, inside_prob, outside_prob, k=5, i_
         girvs.append(tmp['Girvan Newman'])
         leid.append(tmp['Leiden'])
    
+    print(df)
 
     # df[df.columns[1:]] /= k
     # df['Girvan-Newman'] = comms[0]/k

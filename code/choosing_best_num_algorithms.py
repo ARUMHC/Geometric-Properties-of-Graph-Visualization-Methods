@@ -16,7 +16,6 @@ Five different algorithms to choose best number of clusters:
 * silhouette
 * elbow method
 * calinski harabasz
-* BIC + GMM
 
 all those functions take posdf and max_clusters as arguments
 all return optimal numbers of clusters and dataframe with scores
