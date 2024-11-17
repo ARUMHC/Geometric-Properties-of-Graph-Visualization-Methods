@@ -10,7 +10,7 @@ from sklearn.mixture import GaussianMixture
 import warnings
 warnings.filterwarnings('ignore')
 import igraph as ig
-import community
+import community.community_louvain as community
 from graph_generating_script import *
 from sklearn.model_selection import ParameterGrid
 import networkx as nx
@@ -43,45 +43,49 @@ def get_clustering_scores_from_positions(posdf, best_num, true_labels)->dict:
     #agglomerative clustering
     ari_scores = {}
     model = AgglomerativeClustering(n_clusters=best_num)
-    model.fit(posdf)
-    yhat = list(model.labels_)
-    print(len(posdf))
-    print(len(yhat))
-    # scores[0] += adjusted_rand_score(true_labels, yhat)
-    # ari_scores.append(adjusted_rand_score(true_labels, yhat))
-    ari_scores['AgglomerativeClustering'] = adjusted_rand_score(true_labels, yhat)
+    try:
+        model.fit(posdf)
+        yhat = list(model.labels_)
+        ari_scores['AgglomerativeClustering'] = adjusted_rand_score(true_labels, yhat)
+    except:
+        ari_scores['AgglomerativeClustering'] = 'ERROR'
+    
 
     #DBscan
     model = OPTICS()
-    model.fit(posdf)
-    yhat= list(model.labels_)
-    # scores[1] += adjusted_rand_score(true_labels, yhat)
-    # scores.append(adjusted_rand_score(true_labels, yhat))
-    ari_scores['OPTICS'] = adjusted_rand_score(true_labels, yhat)
-
+    try:
+        model.fit(posdf)
+        yhat= list(model.labels_)
+        ari_scores['OPTICS'] = adjusted_rand_score(true_labels, yhat)
+    except:
+        ari_scores['OPTICS'] = 'ERROR'
     # kmeans
     model = KMeans(n_clusters=best_num, random_state=212)
-    model.fit(posdf)
-    yhat = list(model.predict(posdf))
-    # scores[2] += adjusted_rand_score(true_labels, yhat)
-    # scores.append(adjusted_rand_score(true_labels, yhat))
-    ari_scores['KMeans'] = adjusted_rand_score(true_labels, yhat)
+    try:
+        model.fit(posdf)
+        yhat = list(model.predict(posdf))
+        ari_scores['KMeans'] = adjusted_rand_score(true_labels, yhat)
+    except:
+        ari_scores['KMeans'] = 'ERROR'
 
     #GMM
     #modeling
-    model = GaussianMixture(n_components=best_num, random_state=212).fit(posdf)
-    yhat = list(model.predict(posdf))
-    # scores[3] += adjusted_rand_score(true_labels, yhat)
-    # scores.append(adjusted_rand_score(true_labels, yhat))
-    ari_scores['GMM'] = adjusted_rand_score(true_labels, yhat)
+    model = GaussianMixture(n_components=best_num, random_state=212)
+    try:
+        model.fit(posdf)
+        yhat = list(model.predict(posdf))
+        ari_scores['GMM'] = adjusted_rand_score(true_labels, yhat)
+    except:
+        ari_scores['GMM'] = 'ERROR'
     
     #Birch
     model = Birch(n_clusters=best_num)
-    model.fit(posdf)
-    yhat = list(model.predict(posdf))
-    # scores[4] += adjusted_rand_score(true_labels, yhat)
-    # scores.append(adjusted_rand_score(true_labels, yhat))
-    ari_scores['Birch'] = adjusted_rand_score(true_labels, yhat)
+    try:
+        model.fit(posdf)
+        yhat = list(model.predict(posdf))
+        ari_scores['Birch'] = adjusted_rand_score(true_labels, yhat)
+    except:
+        ari_scores['Birch'] = 'ERROR'
 
     return ari_scores
 
@@ -107,23 +111,13 @@ def get_communities_scores_from_positions(G, true_labels):
     communities = list(nx.connected_components(G1))
     list_comms = [i for i, com in enumerate(communities) for node in com]
 
-    # list_comms = [None] * len(G.nodes)
-    # for i, com in enumerate(communities):
-    #     for node in com:
-    #         list_comms[node] = i
-
-
     ari_scores['Girvan Newman'] = adjusted_rand_score(true_labels, list_comms)
     # scores[5] += adjusted_rand_score(true_labels, list_comms)
 
     #@ LEIDEN
-    # G_ig = ig.Graph.TupleList(nx.to_edgelist(G), directed=False)
-    # partition = G_ig.community_leiden(objective_function="modularity")
-    # list_comms = [None] * len(G.nodes)
-    # for i, com in enumerate(partition):
-    #     for node in com:
-    #         list_comms[node] = i
     G_ig = ig.Graph.TupleList(nx.to_edgelist(G), directed=False)
+    missing_vertices = set(G.nodes()) - set(G_ig.vs['name'])
+    G_ig.add_vertices(list(missing_vertices))
 
     resolutions = np.linspace(0.1, 1.5, 10)  # Adjust the range as needed
     param_grid = {'resolution': resolutions}
@@ -138,21 +132,11 @@ def get_communities_scores_from_positions(G, true_labels):
             best_modularity = modularity
             best_partition = partition
 
-    # list_comms = [None] * len(G.nodes)
-    # for i, com in enumerate(best_partition):
-    #     for node in com:
-    #         list_comms[node] = i
     list_comms = [i for i, com in enumerate(best_partition) for node in com]
-
-
-    # scores[6] += adjusted_rand_score(true_labels, list_comms)
     ari_scores['Leiden'] = adjusted_rand_score(true_labels, list_comms)
 
     return ari_scores
 
-
-#todo make a new proper notebook and conduct proper cluster choosing analysis
-#todo zrob to porzadnie faktycznie, cmon
 
 
 # def scaling_igraph(layout):
@@ -213,14 +197,12 @@ def posdf_from_layout(G, layout_name):
         posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
     else:
         raise ValueError('Wrong layout name (probably typo)')
-    print(len(posdf))
     return posdf
 
 def best_number_of_clusters(G, max_clusters=10):
     posdf = posdf_from_layout(G, 'graphopt')
     best_num = mix_ch_elbow(posdf, .75, .25, max_clusters=max_clusters)
     return best_num
-
 
 
 def calculate_scores_for_layout(G, true_labels, layout_name):
@@ -232,8 +214,6 @@ def calculate_scores_for_layout(G, true_labels, layout_name):
   
     '''
     posdf = posdf_from_layout(G, layout_name)
-    print(len(posdf))
-    #todo change this to not be hardcoded
     best_num = best_number_of_clusters(G)
     # best_num = find_best_num_clusters(posdf)
     ari_scores = get_clustering_scores_from_positions(posdf, best_num, true_labels)
@@ -257,14 +237,13 @@ def full_cluster_experiment(G, true_labels):
     for layout_name in layout_names:
         ari_scores = calculate_scores_for_layout(G, true_labels, layout_name)
         df.loc[len(df)] = ari_scores
-    print(df)
     return df
 
 # generates k graphs and conducts FULL experiments on them
 # it sums up ARIs and divides by k (average)
 # returns : df
 
-def steady_full_experiment(n_vertex, n_comms, inside_prob, outside_prob, k=5, i_want_boxplot=False, dispersion=.35):
+def steady_full_experiment(params, k=5, i_want_boxplot=False, dispersion=.35):
     '''
     generates k graphs and conducts FULL experiment on them
     it sums up ARIs and divides by k (average)
@@ -281,11 +260,16 @@ def steady_full_experiment(n_vertex, n_comms, inside_prob, outside_prob, k=5, i_
 7	mds	0.111026	0.079521	0.102880	0.114435	0.130525	0.582956	0.146941
 
     '''
+    # (n_vertex, n_comms, inside_prob, outside_prob) = params 
+    (graph_id, n_vertex, n_comms, inside_prob, outside_prob) = params
+    n_vertex = int(n_vertex)
+    n_comms = int(n_comms)
     # (G, true_labels)= generate_G(sizes, inside_prob, outside_prob)
+
+    #initiating first graph
     (G, true_labels) = generate_G_randomized(n_vertex, n_comms, inside_prob, outside_prob)
     asor = nx.numeric_assortativity_coefficient(G, "community")
     df = full_cluster_experiment(G, true_labels)
-    print(df)
     df.iloc[:, 1:] = df.iloc[:, 1:].applymap(lambda x: [x])
     #comms - dict with two values
     # comms = get_communities(G, true_labels)
@@ -307,8 +291,6 @@ def steady_full_experiment(n_vertex, n_comms, inside_prob, outside_prob, k=5, i_
         girvs.append(tmp['Girvan Newman'])
         leid.append(tmp['Leiden'])
    
-    print(df)
-
     # df[df.columns[1:]] /= k
     # df['Girvan-Newman'] = comms[0]/k
     df['Girvan-Newman'] = [girvs] * len(df)
@@ -316,8 +298,13 @@ def steady_full_experiment(n_vertex, n_comms, inside_prob, outside_prob, k=5, i_
     df['Leiden'] = [leid] * len(df)
 
     print(f'Graphs assortavity coefficient : {asor/k}')
+    
     if i_want_boxplot==False:
-        df.iloc[:, 1:] = df.iloc[:, 1:].applymap(lambda x: sum(x) / k)
+        # df.iloc[:, 1:] = df.iloc[:, 1:].applymap(lambda x: sum(x) / k)'
+        df.iloc[:, 1:] = df.iloc[:, 1:].applymap(lambda x: sum(v for v in x if v != 'ERROR') / len([v for v in x if v != 'ERROR']))
+
+    print(asor)
+    df['assortativity'] = asor/k
 
     return df
     
