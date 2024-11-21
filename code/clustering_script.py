@@ -227,7 +227,6 @@ def full_cluster_experiment(G, true_labels):
     '''
     for ONE graph gets results of ALL layouts (all clustering algorithms)
     '''
-    print("FULL CLUSTER EXPERIMENT")
     # df = pd.DataFrame(columns=['layout','AgglomerativeClustering', 'OPTICS', 'KMeans', 'GMM', 'Birch', 'Girvan Newman', 'Leiden'])
     df = pd.DataFrame(columns=['layout','AgglomerativeClustering', 'OPTICS', 'KMeans', 'GMM', 'Birch'])
 
@@ -278,7 +277,6 @@ def steady_full_experiment(params, k=5, i_want_boxplot=False, dispersion=.35):
     leid = [comms['Leiden']]
     
     for i in tqdm(range(1, k)):
-        # print(i)
         (G, true_labels) = generate_G_randomized(n_vertex, n_comms, inside_prob, outside_prob)
         asor += nx.numeric_assortativity_coefficient(G, "community")
         tmp = full_cluster_experiment(G, true_labels)
@@ -296,14 +294,10 @@ def steady_full_experiment(params, k=5, i_want_boxplot=False, dispersion=.35):
     df['Girvan-Newman'] = [girvs] * len(df)
     # df['Leiden'] = comms[1]/k
     df['Leiden'] = [leid] * len(df)
-
-    print(f'Graphs assortavity coefficient : {asor/k}')
     
     if i_want_boxplot==False:
         # df.iloc[:, 1:] = df.iloc[:, 1:].applymap(lambda x: sum(x) / k)'
         df.iloc[:, 1:] = df.iloc[:, 1:].applymap(lambda x: sum(v for v in x if v != 'ERROR') / len([v for v in x if v != 'ERROR']))
-
-    print(asor)
     df['assortativity'] = asor/k
 
     return df
