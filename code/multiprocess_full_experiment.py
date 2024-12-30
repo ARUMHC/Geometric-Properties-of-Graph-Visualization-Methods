@@ -35,8 +35,7 @@ def main(graph_params, size):
         all_graphs_df = pd.concat([all_graphs_df, single_df], axis=0)
 
     # Save the final DataFrame to an Excel file
-    all_graphs_df.to_excel(fr'C:\Users\Kinga\Desktop\MAGISTERKA\Geometric-Properties-of-Graph-Visualization-Methods\code\whole_experiment\{size}_steady_ex.xlsx', index=False)
-
+    all_graphs_df.to_csv(fr'C:\Users\Kinga\Desktop\MAGISTERKA\Geometric-Properties-of-Graph-Visualization-Methods\code\whole_experiment\{size}_steady_ex.csv', index=False)
 if __name__ == '__main__':
 
     #@ PLACE THAT SETS THE SIZES TO RUN
@@ -50,6 +49,6 @@ if __name__ == '__main__':
         main(graph_params, size=size_to_run)
         end_time = time.time()  
         elapsed_time = end_time - start_time
-        minutes, seconds = divmod(elapsed_time, 60)
+        minutes, seconds = divmod(elapsed_time,60)
         print(f"Total execution time: {int(minutes)} minutes and {seconds:.2f} seconds")
         # print(f"It took {elapsed_time} seconds to process size {size_to_run}")

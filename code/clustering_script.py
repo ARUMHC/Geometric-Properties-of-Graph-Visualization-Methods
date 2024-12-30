@@ -14,7 +14,7 @@ import community.community_louvain as community
 from graph_generating_script import *
 from sklearn.model_selection import ParameterGrid
 import networkx as nx
-
+import genieclust
 
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
@@ -22,7 +22,9 @@ import numpy as np
 from tqdm import tqdm
 
 from sklearn.cluster import AgglomerativeClustering, OPTICS
-from choosing_best_num_algorithms import mix_ch_elbow
+
+# from code.NUM_CLUST_choosing_method.clus_num_methods import mix_ch_elbow
+from NUM_CLUST_choosing_method.clus_num_methods import mix_ch_elbow
 
 # get results from one model on one graph on one of the layouts
 # returns : scores - list with ARI
@@ -86,6 +88,15 @@ def get_clustering_scores_from_positions(posdf, best_num, true_labels)->dict:
         ari_scores['Birch'] = adjusted_rand_score(true_labels, yhat)
     except:
         ari_scores['Birch'] = 'ERROR'
+
+    # Genie
+    try:
+        model = genieclust.Genie(n_clusters=best_num)
+        yhat = list(model.fit_predict(posdf))
+        ari_scores['Genie'] = adjusted_rand_score(true_labels, yhat)
+    except:
+        ari_scores['Genie'] = 'ERROR'
+
 
     return ari_scores
 
@@ -200,8 +211,14 @@ def posdf_from_layout(G, layout_name):
     return posdf
 
 def best_number_of_clusters(G, max_clusters=10):
-    posdf = posdf_from_layout(G, 'graphopt')
+    # posdf = posdf_from_layout(G, 'graphopt')
+    G_ig = ig.Graph.TupleList(nx.to_edgelist(G), directed=False)
+    missing_vertices = set(G.nodes()) - set(G_ig.vs['name'])
+    G_ig.add_vertices(list(missing_vertices))
+    layout = G_ig.layout('fruchterman_reingold')
+    posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
     best_num = mix_ch_elbow(posdf, .75, .25, max_clusters=max_clusters)
+
     return best_num
 
 
@@ -228,7 +245,7 @@ def full_cluster_experiment(G, true_labels):
     for ONE graph gets results of ALL layouts (all clustering algorithms)
     '''
     # df = pd.DataFrame(columns=['layout','AgglomerativeClustering', 'OPTICS', 'KMeans', 'GMM', 'Birch', 'Girvan Newman', 'Leiden'])
-    df = pd.DataFrame(columns=['layout','AgglomerativeClustering', 'OPTICS', 'KMeans', 'GMM', 'Birch'])
+    df = pd.DataFrame(columns=['layout','AgglomerativeClustering', 'OPTICS', 'KMeans', 'GMM', 'Birch', 'Genie'])
 
     #for every layout
     #kamada kawai
