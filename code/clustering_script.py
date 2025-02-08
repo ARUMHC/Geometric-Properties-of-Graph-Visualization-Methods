@@ -148,7 +148,25 @@ def get_communities_scores_from_positions(G, true_labels):
 
     return ari_scores
 
+def rescale_igraph_pos(pos):
+    coords = np.array(list(pos.values()))
+    min_coords = coords.min(axis=0)
+    max_coords = coords.max(axis=0)
+    scaled_coords = 2 * (coords - min_coords) / (max_coords - min_coords) - 1
 
+    # Create a dictionary of rescaled positions for NetworkX
+    rescaled_pos = {i: scaled_coords[i] for i in range(len(scaled_coords))}
+    return rescaled_pos
+
+def rescale_dataframe_coords(df):
+    coords = df.values
+    min_coords = coords.min(axis=0)
+    max_coords = coords.max(axis=0)
+    scaled_coords = 2 * (coords - min_coords) / (max_coords - min_coords) - 1
+    
+    # Create a new DataFrame with the rescaled coordinates
+    rescaled_df = pd.DataFrame(scaled_coords, columns=df.columns, index=df.index)
+    return rescaled_df
 
 # def scaling_igraph(layout):
 #     coords = np.array(layout.coords)
@@ -175,37 +193,44 @@ def posdf_from_layout(G, layout_name):
         missing_vertices = set(G.nodes()) - set(G_ig.vs['name'])
         G_ig.add_vertices(list(missing_vertices))
         layout = G_ig.layout('davidson_harel')
+        # layout = rescale_igraph_pos(layout)
         posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
+        posdf = rescale_dataframe_coords(posdf)
     elif layout_name=='drl':
         G_ig = ig.Graph.TupleList(nx.to_edgelist(G), directed=False)
         missing_vertices = set(G.nodes()) - set(G_ig.vs['name'])
         G_ig.add_vertices(list(missing_vertices))
         layout = G_ig.layout('drl')
         posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
+        posdf = rescale_dataframe_coords(posdf)
     elif layout_name=='fruchterman_reingold':
         G_ig = ig.Graph.TupleList(nx.to_edgelist(G), directed=False)
         missing_vertices = set(G.nodes()) - set(G_ig.vs['name'])
         G_ig.add_vertices(list(missing_vertices))
         layout = G_ig.layout('fruchterman_reingold')
         posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
+        posdf = rescale_dataframe_coords(posdf)
     elif layout_name=='graphopt':
         G_ig = ig.Graph.TupleList(nx.to_edgelist(G), directed=False)
         missing_vertices = set(G.nodes()) - set(G_ig.vs['name'])
         G_ig.add_vertices(list(missing_vertices))
         layout = G_ig.layout('graphopt')
         posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
+        posdf = rescale_dataframe_coords(posdf)
     elif layout_name=='lgl':
         G_ig = ig.Graph.TupleList(nx.to_edgelist(G), directed=False)
         missing_vertices = set(G.nodes()) - set(G_ig.vs['name'])
         G_ig.add_vertices(list(missing_vertices))
         layout = G_ig.layout('lgl')
         posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
+        posdf = rescale_dataframe_coords(posdf)
     elif layout_name=='mds':
         G_ig = ig.Graph.TupleList(nx.to_edgelist(G), directed=False)
         missing_vertices = set(G.nodes()) - set(G_ig.vs['name'])
         G_ig.add_vertices(list(missing_vertices))
         layout = G_ig.layout('mds')
         posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
+        posdf = rescale_dataframe_coords(posdf)
     else:
         raise ValueError('Wrong layout name (probably typo)')
     return posdf
@@ -217,6 +242,7 @@ def best_number_of_clusters(G, max_clusters=10):
     G_ig.add_vertices(list(missing_vertices))
     layout = G_ig.layout('fruchterman_reingold')
     posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
+    posdf = rescale_dataframe_coords(posdf)
     best_num = mix_ch_elbow(posdf, .75, .25, max_clusters=max_clusters)
 
     return best_num
