@@ -39,7 +39,7 @@ def main(graph_params, size):
 if __name__ == '__main__':
 
     #@ PLACE THAT SETS THE SIZES TO RUN
-    sizes_to_run = [125]
+    sizes_to_run = [25, 50, 75, 100, 125, 150]
 
     for size_to_run in sizes_to_run:
         print(f"=== processing size {size_to_run} ===")
