@@ -243,7 +243,7 @@ def best_number_of_clusters(G, max_clusters=10):
     layout = G_ig.layout('fruchterman_reingold')
     posdf = pd.DataFrame(layout.coords, columns=['X', 'Y'])
     posdf = rescale_dataframe_coords(posdf)
-    best_num = mix_ch_elbow(posdf, .75, .25, max_clusters=max_clusters)
+    best_num = mix_ch_elbow(posdf, .5, .5, max_clusters=max_clusters)
 
     return best_num
 
