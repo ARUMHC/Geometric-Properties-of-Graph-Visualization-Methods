@@ -36,6 +36,7 @@ def main(graph_params, size):
 
     # Save the final DataFrame to an Excel file
     all_graphs_df.to_csv(fr'C:\Users\Kinga\Desktop\MAGISTERKA\Geometric-Properties-of-Graph-Visualization-Methods\code\whole_experiment\{size}_steady_ex.csv', index=False)
+    
 if __name__ == '__main__':
 
     #@ PLACE THAT SETS THE SIZES TO RUN
